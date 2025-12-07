@@ -102,7 +102,7 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "Test the Neural Car Simulator application with comprehensive tests covering UI elements, control panel functionality, statistics panel, simulation canvas, sensor visualization, neural network visualization, pause/resume functionality, speed control, toast notifications, and responsive layout."
+user_problem_statement: "Upgrade the Neural Car Simulator with: 1) Manual Driving Mode + AI Assist Mode with collision warnings and safe direction arrows, 2) Cleaner modern UI with better organization, 3) Performance optimizations for 60 FPS, 4) Advanced Save/Load System with model manager dialog, 5) Traffic Density Control (0-300%)"
 
 frontend:
   - task: "Neural Car Simulator UI Components"
