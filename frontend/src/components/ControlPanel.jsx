@@ -17,7 +17,9 @@ export const ControlPanel = ({
   onToggleNetwork,
   onReset,
   onSave,
-  onLoad
+  onLoad,
+  populationSize,
+  onPopulationChange
 }) => {
   return (
     <Card className="border-glow-cyan bg-card/50 backdrop-blur-sm">
@@ -72,6 +74,26 @@ export const ControlPanel = ({
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>0.1x</span>
             <span>5x</span>
+          </div>
+        </div>
+
+        {/* Population Control */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Label className="text-foreground font-medium">Population Size</Label>
+            <span className="text-primary font-mono text-sm">{populationSize}</span>
+          </div>
+          <Slider
+            value={[populationSize]}
+            onValueChange={(value) => onPopulationChange(value[0])}
+            min={10}
+            max={200}
+            step={10}
+            className="w-full"
+          />
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>10</span>
+            <span>200</span>
           </div>
         </div>
 

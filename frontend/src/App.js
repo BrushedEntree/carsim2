@@ -9,6 +9,7 @@ import { Brain, Zap } from 'lucide-react';
 function App() {
   const [isRunning, setIsRunning] = useState(true);
   const [speedMultiplier, setSpeedMultiplier] = useState(1);
+  const [populationSize, setPopulationSize] = useState(100);
   const [showSensors, setShowSensors] = useState(true);
   const [showNetwork, setShowNetwork] = useState(false);
   const [stats, setStats] = useState({
@@ -64,7 +65,7 @@ function App() {
   return (
     <div className="min-h-screen bg-background">
       <Toaster position="top-right" theme="dark" />
-      
+
       {/* Header */}
       <header className="border-b border-border/50 bg-card/30 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
@@ -107,6 +108,8 @@ function App() {
               onReset={handleReset}
               onSave={handleSave}
               onLoad={handleLoad}
+              populationSize={populationSize}
+              onPopulationChange={setPopulationSize}
             />
             <StatsPanel stats={stats} />
           </div>
@@ -117,13 +120,14 @@ function App() {
               <Simulator
                 isRunning={isRunning}
                 speedMultiplier={speedMultiplier}
+                populationSize={populationSize}
                 showSensors={showSensors}
                 showNetwork={showNetwork}
                 onStatsUpdate={setStats}
                 resetTrigger={resetTrigger}
               />
             </div>
-            
+
             {/* Info Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
               <div className="p-4 rounded-lg bg-muted/30 border border-primary/20">
