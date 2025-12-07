@@ -14,7 +14,7 @@ function App() {
   const [showSensors, setShowSensors] = useState(true);
   const [showNetwork, setShowNetwork] = useState(false);
   const [controlMode, setControlMode] = useState('AI_AUTO'); // 'MANUAL', 'AI_AUTO', 'AI_ASSIST'
-  const [trafficDensity, setTrafficDensity] = useState(100); // 0-300%
+  const [trafficDensity, setTrafficDensity] = useState(150); // 0-300%
   const [modelManagerOpen, setModelManagerOpen] = useState(false);
   const [stats, setStats] = useState({
     generation: 0,
@@ -38,7 +38,7 @@ function App() {
   const handleControlModeChange = (newMode) => {
     setControlMode(newMode);
     setResetTrigger(prev => prev + 1);
-    toast.info(`Switched to ${newMode === 'MANUAL' ? 'Manual Drive' : newMode === 'AI_AUTO' ? 'AI Auto' : 'AI Assist'} mode`);
+    toast.info(`Switched to ${newMode === 'MANUAL' ? 'Manual Drive' : 'AI Auto'} mode`);
   };
 
   const handleReset = () => {
@@ -96,8 +96,6 @@ function App() {
               onPopulationChange={setPopulationSize}
               controlMode={controlMode}
               onControlModeChange={handleControlModeChange}
-              trafficDensity={trafficDensity}
-              onTrafficDensityChange={setTrafficDensity}
               onOpenModelManager={() => setModelManagerOpen(true)}
             />
             <StatsPanel stats={stats} />

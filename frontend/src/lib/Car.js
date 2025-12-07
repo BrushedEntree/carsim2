@@ -156,10 +156,10 @@ export class Car {
 
     // Steering
     if (this.manualControls.left) {
-      this.angleSpeed = -0.03;
+      this.angleSpeed = 0.03;
     }
     if (this.manualControls.right) {
-      this.angleSpeed = 0.03;
+      this.angleSpeed = -0.03;
     }
 
     // Throttle
@@ -211,46 +211,65 @@ export class Car {
   }
 
   calculateCollisionProximity() {
-    // Find minimum sensor distance (closest obstacle)
-    let minDistance = 1.0;
+    // Find maximum sensor value (closest obstacle)
+    // reading.distance is normalized closeness: 0 = far/nothing, 1 = touching
+    let maxCloseness = 0;
     for (const reading of this.sensorReadings) {
-      if (reading && reading.distance > minDistance) {
-        minDistance = reading.distance;
+      if (reading && reading.distance > maxCloseness) {
+        maxCloseness = reading.distance;
       }
     }
-    // Higher distance value = closer to obstacle
-    this.collisionProximity = Math.pow(minDistance, 2); // Square for non-linear increase
+
+    // Higher value = closer to obstacle
+    // Use power curve to make it reactive mostly when getting quite close, but sooner than square
+    this.collisionProximity = Math.pow(maxCloseness, 1.5);
   }
 
   calculateSafeDirection() {
-    // Find direction with most clearance
-    const directions = [
-      { angle: 0, distance: 0, label: 'forward' },           // forward
-      { angle: Math.PI / 4, distance: 0, label: 'forward-right' },     // forward-right
-      { angle: -Math.PI / 4, distance: 0, label: 'forward-left' },    // forward-left
-      { angle: Math.PI / 2, distance: 0, label: 'right' },         // right
-      { angle: -Math.PI / 2, distance: 0, label: 'left' },        // left
-    ];
+    // Use weighted vector sum to find safest average direction
+    let vectorX = 0;
+    let vectorY = 0;
 
-    // Map sensor readings to directions
-    for (let i = 0; i < Math.min(5, this.sensorReadings.length); i++) {
+    // Check front sensor for forward bias scaling
+    const frontSensorIndex = 0; // Assuming 0 is forward
+    const frontReading = this.sensorReadings[frontSensorIndex];
+    const frontClearance = frontReading ? (1 - frontReading.distance) : 1;
+
+    // Add forward bias to encourage moving forward when open
+    // Scale by front clearance: if blocked, don't bias forward
+    const forwardBias = 0.5 * frontClearance;
+    vectorX += Math.sin(0) * forwardBias;
+    vectorY += Math.cos(0) * forwardBias;
+
+    let totalWeight = 0;
+
+    for (let i = 0; i < this.sensors.length; i++) {
+      const sensor = this.sensors[i];
       const reading = this.sensorReadings[i];
-      if (reading) {
-        directions[i].distance = 1 - reading.distance; // Invert: higher = safer
-      } else {
-        directions[i].distance = 1; // No obstacle = safe
-      }
+
+      // Calculate clearance (0 = blocked, 1 = clear)
+      const clearance = reading ? (1 - reading.distance) : 1;
+      const blockage = 1 - clearance;
+
+      // 1. Attraction to clear space
+      const attractionWeight = Math.pow(clearance, 2);
+      vectorX += Math.sin(sensor.angle) * attractionWeight;
+      vectorY += Math.cos(sensor.angle) * attractionWeight;
+
+      // 2. Repulsion from obstacles
+      // Push vector in OPPOSITE direction of sensor angle
+      // Stronger repulsion when closer
+      const repulsionWeight = Math.pow(blockage, 2) * 2.0;
+      vectorX -= Math.sin(sensor.angle) * repulsionWeight;
+      vectorY -= Math.cos(sensor.angle) * repulsionWeight;
+
+      totalWeight += attractionWeight + repulsionWeight;
     }
 
-    // Find safest direction
-    let safest = directions[0];
-    for (const dir of directions) {
-      if (dir.distance > safest.distance) {
-        safest = dir;
-      }
-    }
-
-    this.safeDirection = safest;
+    // Always calculate an angle, even if we are mostly canceling out
+    // ideally the repulsion vectors push us sideways/backwards when front is blocked
+    const bestAngle = Math.atan2(vectorX, vectorY);
+    this.safeDirection = { angle: bestAngle };
   }
 
   updateSensors(roadBorders, traffic) {
@@ -258,7 +277,6 @@ export class Car {
       return this.castRay(sensor, roadBorders, traffic);
     });
   }
-
   castRay(sensor, roadBorders, traffic) {
     const rayAngle = this.angle + sensor.angle;
     const rayEnd = {

@@ -5,7 +5,7 @@ import { Slider } from './ui/slider';
 import { Switch } from './ui/switch';
 import { Label } from './ui/label';
 import { Separator } from './ui/separator';
-import { Play, Pause, RotateCcw, Download, Upload, Database, Gamepad2, Brain, Users } from 'lucide-react';
+import { Play, Pause, RotateCcw, Download, Upload, Database, Gamepad2, Brain } from 'lucide-react';
 
 export const ControlPanel = ({
   isRunning,
@@ -23,8 +23,6 @@ export const ControlPanel = ({
   onPopulationChange,
   controlMode,
   onControlModeChange,
-  trafficDensity,
-  onTrafficDensityChange,
   onOpenModelManager
 }) => {
   return (
@@ -88,16 +86,8 @@ export const ControlPanel = ({
               <Brain className="mr-2 h-4 w-4" />
               AI Auto
             </Button>
-            <Button
-              onClick={() => onControlModeChange('AI_ASSIST')}
-              variant={controlMode === 'AI_ASSIST' ? 'default' : 'outline'}
-              className={controlMode === 'AI_ASSIST' ? 'bg-primary text-primary-foreground' : 'border-primary/30'}
-            >
-              <Users className="mr-2 h-4 w-4" />
-              AI Assist
-            </Button>
           </div>
-          {(controlMode === 'MANUAL' || controlMode === 'AI_ASSIST') && (
+          {controlMode === 'MANUAL' && (
             <p className="text-xs text-muted-foreground mt-2">
               Use Arrow Keys or WASD to drive
             </p>
@@ -109,7 +99,7 @@ export const ControlPanel = ({
         {/* Speed Control */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label className="text-foreground font-medium">Simulation Speed</Label>
+            <Label className="text-foreground font-medium">Traffic Speed</Label>
             <span className="text-primary font-mono text-sm">{speedMultiplier}x</span>
           </div>
           <Slider
@@ -148,25 +138,7 @@ export const ControlPanel = ({
           </div>
         )}
 
-        {/* Traffic Density Control */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Label className="text-foreground font-medium">Traffic Density</Label>
-            <span className="text-secondary font-mono text-sm">{trafficDensity}%</span>
-          </div>
-          <Slider
-            value={[trafficDensity]}
-            onValueChange={(value) => onTrafficDensityChange(value[0])}
-            min={0}
-            max={300}
-            step={10}
-            className="w-full"
-          />
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>0%</span>
-            <span>300%</span>
-          </div>
-        </div>
+
 
         <Separator className="bg-primary/20" />
 

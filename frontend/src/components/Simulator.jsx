@@ -23,6 +23,8 @@ export const Simulator = ({
   const roadRef = useRef(null);
   const bestCarRef = useRef(null);
   const playerCarRef = useRef(null);
+  const frameCountRef = useRef(0);
+  const cameraYRef = useRef(0);
 
   // Refs for props to access fresh values inside animation loop
   const isRunningRef = useRef(isRunning);
@@ -45,8 +47,8 @@ export const Simulator = ({
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (!playerCarRef.current) return;
-      
-      switch(e.key) {
+
+      switch (e.key) {
         case 'ArrowUp':
         case 'w':
         case 'W':
@@ -72,8 +74,8 @@ export const Simulator = ({
 
     const handleKeyUp = (e) => {
       if (!playerCarRef.current) return;
-      
-      switch(e.key) {
+
+      switch (e.key) {
         case 'ArrowUp':
         case 'w':
         case 'W':
@@ -120,7 +122,8 @@ export const Simulator = ({
 
     const ctx = canvas.getContext('2d');
     canvas.width = 800;
-    canvas.height = 600;
+    canvas.width = 800;
+    canvas.height = 800;
 
     // Initialize road
     roadRef.current = {
@@ -161,9 +164,12 @@ export const Simulator = ({
     const laneWidth = road.width / road.laneCount;
     const startX = road.x - road.width / 2 + laneWidth / 2 + laneWidth;
 
-    // Create cars based on control mode
     carsRef.current = [];
-    
+    bestCarRef.current = null;
+    playerCarRef.current = null;
+    trafficRef.current = [];
+    cameraYRef.current = 0; // Reset camera position
+
     if (controlMode === 'MANUAL' || controlMode === 'AI_ASSIST') {
       // Single player car
       const car = new Car(startX, 100, 30, 50, controlMode, '#00ffff');
@@ -247,7 +253,7 @@ export const Simulator = ({
           aliveCars.push(carsRef.current[i]);
         }
       }
-      
+
       if (aliveCars.length > 0) {
         bestCarRef.current = aliveCars[0];
         for (let i = 1; i < aliveCars.length; i++) {
@@ -289,27 +295,46 @@ export const Simulator = ({
       playerCarRef.current.score = 0;
       playerCarRef.current.distanceTraveled = 0;
       playerCarRef.current.timeAlive = 0;
-      
+
       const startX = road.x - road.width / 2 + laneWidth / 2 + laneWidth;
       playerCarRef.current.x = startX;
       playerCarRef.current.y = 100;
       playerCarRef.current.angle = 0;
       playerCarRef.current.speed = 0;
-      
+
       initializeTraffic();
     }
 
-    // Update stats
-    const stats = gaRef.current.getStats(carsRef.current);
-    onStatsUpdate(stats);
+    // Update stats (throttled to every 10 frames to prevent UI lag)
+    frameCountRef.current++;
+    if (frameCountRef.current % 10 === 0) {
+      const stats = gaRef.current.getStats(carsRef.current);
+      onStatsUpdate(stats);
+    }
 
     // RENDERING (optimized)
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Set camera to follow best car
+    // Set camera to follow best car with smoothed movement (LERP)
     ctx.save();
     if (bestCarRef.current) {
-      ctx.translate(0, -bestCarRef.current.y + canvas.height * 0.7);
+      const zoom = 0.8;
+      const camX = canvas.width / 2;
+      const targetY = bestCarRef.current.y;
+
+      // Initialize if reset (0) or snap if too far
+      if (cameraYRef.current === 0 || Math.abs(cameraYRef.current - targetY) > 2000) {
+        cameraYRef.current = targetY;
+      } else {
+        // LERP: Move 10% towards target per frame
+        cameraYRef.current = cameraYRef.current + (targetY - cameraYRef.current) * 0.1;
+      }
+
+      const camY = cameraYRef.current;
+
+      ctx.translate(camX, canvas.height * 0.7);
+      ctx.scale(zoom, zoom);
+      ctx.translate(-camX, -camY);
     }
 
     // Draw road
@@ -489,7 +514,7 @@ export const Simulator = ({
         <canvas
           ref={canvasRef}
           className="w-full border-2 border-glow-cyan rounded-lg bg-muted/20"
-          style={{ maxHeight: '600px' }}
+          style={{ maxHeight: '800px' }}
         />
       </div>
       {showNetwork && (
@@ -497,7 +522,7 @@ export const Simulator = ({
           <canvas
             ref={networkCanvasRef}
             width={320}
-            height={600}
+            height={800}
             className="w-full border-2 border-glow-magenta rounded-lg bg-muted/20"
           />
         </div>
