@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Simulator } from './components/Simulator';
 import { ControlPanel } from './components/ControlPanel';
 import { StatsPanel } from './components/StatsPanel';
+import { ModelManager } from './components/ModelManager';
 import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner';
 import { Brain, Zap } from 'lucide-react';
@@ -12,6 +13,9 @@ function App() {
   const [populationSize, setPopulationSize] = useState(100);
   const [showSensors, setShowSensors] = useState(true);
   const [showNetwork, setShowNetwork] = useState(false);
+  const [controlMode, setControlMode] = useState('AI_AUTO'); // 'MANUAL', 'AI_AUTO', 'AI_ASSIST'
+  const [trafficDensity, setTrafficDensity] = useState(100); // 0-300%
+  const [modelManagerOpen, setModelManagerOpen] = useState(false);
   const [stats, setStats] = useState({
     generation: 0,
     alive: 0,
