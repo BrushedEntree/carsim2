@@ -92,10 +92,13 @@ function App() {
               showNetwork={showNetwork}
               onToggleNetwork={setShowNetwork}
               onReset={handleReset}
-              onSave={handleSave}
-              onLoad={handleLoad}
               populationSize={populationSize}
               onPopulationChange={setPopulationSize}
+              controlMode={controlMode}
+              onControlModeChange={handleControlModeChange}
+              trafficDensity={trafficDensity}
+              onTrafficDensityChange={setTrafficDensity}
+              onOpenModelManager={() => setModelManagerOpen(true)}
             />
             <StatsPanel stats={stats} />
           </div>
