@@ -210,39 +210,61 @@ export const Simulator = ({
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     const road = roadRef.current;
+    const currentMode = controlModeRef.current;
 
     // Update cars
-    carsRef.current.forEach(car => {
-      car.update(road.borders, trafficRef.current, speedRef.current);
-    });
+    const carCount = carsRef.current.length;
+    for (let i = 0; i < carCount; i++) {
+      carsRef.current[i].update(road.borders, trafficRef.current, speedRef.current);
+    }
 
     // Update traffic
-    trafficRef.current.forEach(car => {
+    const trafficCount = trafficRef.current.length;
+    const laneWidth = road.width / road.laneCount;
+    for (let i = 0; i < trafficCount; i++) {
+      const car = trafficRef.current[i];
       car.update([], [], speedRef.current);
 
       // Respawn traffic if it goes off screen
       if (car.y > canvas.height + 100) {
-        const laneWidth = road.width / road.laneCount;
         const lane = Math.floor(Math.random() * road.laneCount);
         car.x = road.x - road.width / 2 + laneWidth / 2 + lane * laneWidth;
         car.y = -100;
       }
-    });
-
-    // Find best car
-    const aliveCars = carsRef.current.filter(c => !c.damaged);
-    if (aliveCars.length > 0) {
-      bestCarRef.current = aliveCars.reduce((best, car) =>
-        car.score > best.score ? car : best
-      );
-    } else {
-      bestCarRef.current = null;
     }
 
-    // Check if generation is complete
-    if (aliveCars.length === 0) {
+    // Find best car
+    let aliveCars;
+    if (currentMode === 'MANUAL' || currentMode === 'AI_ASSIST') {
+      // Manual/Assist mode - track player car
+      bestCarRef.current = playerCarRef.current;
+      aliveCars = playerCarRef.current && !playerCarRef.current.damaged ? [playerCarRef.current] : [];
+    } else {
+      // AI Auto mode - find best performing car
+      aliveCars = [];
+      for (let i = 0; i < carCount; i++) {
+        if (!carsRef.current[i].damaged) {
+          aliveCars.push(carsRef.current[i]);
+        }
+      }
+      
+      if (aliveCars.length > 0) {
+        bestCarRef.current = aliveCars[0];
+        for (let i = 1; i < aliveCars.length; i++) {
+          if (aliveCars[i].score > bestCarRef.current.score) {
+            bestCarRef.current = aliveCars[i];
+          }
+        }
+      } else {
+        bestCarRef.current = null;
+      }
+    }
+
+    // Check if generation is complete (AI Auto mode only)
+    if (currentMode === 'AI_AUTO' && aliveCars.length === 0) {
       const newBrains = gaRef.current.evolve(carsRef.current);
-      carsRef.current.forEach((car, i) => {
+      for (let i = 0; i < carCount; i++) {
+        const car = carsRef.current[i];
         car.brain = newBrains[i];
         car.damaged = false;
         car.score = 0;
@@ -250,15 +272,30 @@ export const Simulator = ({
         car.timeAlive = 0;
 
         // Reset position
-        const laneWidth = road.width / road.laneCount;
         const startX = road.x - road.width / 2 + laneWidth / 2 + laneWidth;
         car.x = startX;
         car.y = 100;
         car.angle = 0;
         car.speed = 0;
-      });
+      }
 
       // Reset traffic
+      initializeTraffic();
+    }
+
+    // Reset player car in manual/assist mode
+    if ((currentMode === 'MANUAL' || currentMode === 'AI_ASSIST') && aliveCars.length === 0 && playerCarRef.current) {
+      playerCarRef.current.damaged = false;
+      playerCarRef.current.score = 0;
+      playerCarRef.current.distanceTraveled = 0;
+      playerCarRef.current.timeAlive = 0;
+      
+      const startX = road.x - road.width / 2 + laneWidth / 2 + laneWidth;
+      playerCarRef.current.x = startX;
+      playerCarRef.current.y = 100;
+      playerCarRef.current.angle = 0;
+      playerCarRef.current.speed = 0;
+      
       initializeTraffic();
     }
 
@@ -266,7 +303,7 @@ export const Simulator = ({
     const stats = gaRef.current.getStats(carsRef.current);
     onStatsUpdate(stats);
 
-    // Draw
+    // RENDERING (optimized)
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Set camera to follow best car
@@ -278,27 +315,38 @@ export const Simulator = ({
     // Draw road
     drawRoad(ctx, road, canvas.height);
 
-    // Draw traffic
-    trafficRef.current.forEach(car => car.draw(ctx, false));
+    // Draw traffic (batched)
+    for (let i = 0; i < trafficCount; i++) {
+      trafficRef.current[i].draw(ctx, false);
+    }
 
-    // Draw AI cars (non-best faded)
-    carsRef.current.forEach(car => {
-      if (car !== bestCarRef.current) {
-        ctx.globalAlpha = 0.2;
-        car.draw(ctx, false);
-        ctx.globalAlpha = 1;
+    // Draw cars based on mode
+    if (currentMode === 'MANUAL' || currentMode === 'AI_ASSIST') {
+      // Draw player car with sensors if enabled
+      if (playerCarRef.current) {
+        playerCarRef.current.draw(ctx, showSensorsRef.current);
       }
-    });
+    } else {
+      // Draw AI cars (non-best faded)
+      for (let i = 0; i < carCount; i++) {
+        const car = carsRef.current[i];
+        if (car !== bestCarRef.current) {
+          ctx.globalAlpha = 0.2;
+          car.draw(ctx, false);
+          ctx.globalAlpha = 1;
+        }
+      }
 
-    // Draw best car
-    if (bestCarRef.current) {
-      bestCarRef.current.draw(ctx, showSensorsRef.current);
+      // Draw best car with sensors if enabled
+      if (bestCarRef.current) {
+        bestCarRef.current.draw(ctx, showSensorsRef.current);
+      }
     }
 
     ctx.restore();
 
-    // Draw network visualization
-    if (showNetworkRef.current && bestCarRef.current) {
+    // Draw network visualization (outside animation loop optimization)
+    if (showNetworkRef.current && bestCarRef.current && bestCarRef.current.brain) {
       drawNetwork(bestCarRef.current);
     }
 
