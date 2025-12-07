@@ -150,6 +150,109 @@ export class Car {
     }
   }
 
+  manualControl() {
+    // Reset angle speed
+    this.angleSpeed = 0;
+
+    // Steering
+    if (this.manualControls.left) {
+      this.angleSpeed = -0.03;
+    }
+    if (this.manualControls.right) {
+      this.angleSpeed = 0.03;
+    }
+
+    // Throttle
+    if (this.manualControls.forward) {
+      this.speed += this.acceleration;
+    }
+
+    // Brake
+    if (this.manualControls.backward) {
+      this.speed -= this.acceleration * 2;
+    }
+  }
+
+  aiAssistControl() {
+    // Get AI suggestion
+    const inputs = [
+      ...this.sensorReadings.map(r => r ? r.distance : 0),
+      this.speed / this.maxSpeed
+    ];
+    const { outputs } = this.brain.predict(inputs);
+    const aiSteer = (outputs[0] - 0.5) * 2;
+    const aiThrottle = outputs[1];
+    const aiBrake = outputs[2];
+
+    // Manual controls
+    let manualSteer = 0;
+    if (this.manualControls.left) manualSteer = -1;
+    if (this.manualControls.right) manualSteer = 1;
+
+    // Calculate assist strength based on collision proximity
+    const assistStrength = this.collisionProximity; // 0 = no assist, 1 = full AI control
+
+    // Blend manual and AI steering
+    const blendedSteer = manualSteer * (1 - assistStrength) + aiSteer * assistStrength;
+    this.angleSpeed = blendedSteer * 0.03;
+
+    // Manual throttle/brake with AI override on danger
+    if (this.manualControls.forward) {
+      this.speed += this.acceleration * (1 - assistStrength * 0.5);
+    }
+    if (this.manualControls.backward) {
+      this.speed -= this.acceleration * 2;
+    }
+
+    // AI brake on high danger
+    if (assistStrength > 0.7 && aiBrake > 0.5) {
+      this.speed -= this.acceleration * 2;
+    }
+  }
+
+  calculateCollisionProximity() {
+    // Find minimum sensor distance (closest obstacle)
+    let minDistance = 1.0;
+    for (const reading of this.sensorReadings) {
+      if (reading && reading.distance > minDistance) {
+        minDistance = reading.distance;
+      }
+    }
+    // Higher distance value = closer to obstacle
+    this.collisionProximity = Math.pow(minDistance, 2); // Square for non-linear increase
+  }
+
+  calculateSafeDirection() {
+    // Find direction with most clearance
+    const directions = [
+      { angle: 0, distance: 0, label: 'forward' },           // forward
+      { angle: Math.PI / 4, distance: 0, label: 'forward-right' },     // forward-right
+      { angle: -Math.PI / 4, distance: 0, label: 'forward-left' },    // forward-left
+      { angle: Math.PI / 2, distance: 0, label: 'right' },         // right
+      { angle: -Math.PI / 2, distance: 0, label: 'left' },        // left
+    ];
+
+    // Map sensor readings to directions
+    for (let i = 0; i < Math.min(5, this.sensorReadings.length); i++) {
+      const reading = this.sensorReadings[i];
+      if (reading) {
+        directions[i].distance = 1 - reading.distance; // Invert: higher = safer
+      } else {
+        directions[i].distance = 1; // No obstacle = safe
+      }
+    }
+
+    // Find safest direction
+    let safest = directions[0];
+    for (const dir of directions) {
+      if (dir.distance > safest.distance) {
+        safest = dir;
+      }
+    }
+
+    this.safeDirection = safest;
+  }
+
   updateSensors(roadBorders, traffic) {
     this.sensorReadings = this.sensors.map(sensor => {
       return this.castRay(sensor, roadBorders, traffic);
