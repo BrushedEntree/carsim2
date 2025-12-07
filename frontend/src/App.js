@@ -114,6 +114,8 @@ function App() {
                 showNetwork={showNetwork}
                 onStatsUpdate={setStats}
                 resetTrigger={resetTrigger}
+                controlMode={controlMode}
+                trafficDensity={trafficDensity}
               />
             </div>
 
