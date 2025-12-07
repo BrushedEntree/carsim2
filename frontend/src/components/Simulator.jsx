@@ -41,6 +41,78 @@ export const Simulator = ({
     trafficDensityRef.current = trafficDensity;
   }, [isRunning, speedMultiplier, showSensors, showNetwork, controlMode, trafficDensity]);
 
+  // Keyboard controls for manual mode
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!playerCarRef.current) return;
+      
+      switch(e.key) {
+        case 'ArrowUp':
+        case 'w':
+        case 'W':
+          playerCarRef.current.manualControls.forward = true;
+          break;
+        case 'ArrowDown':
+        case 's':
+        case 'S':
+          playerCarRef.current.manualControls.backward = true;
+          break;
+        case 'ArrowLeft':
+        case 'a':
+        case 'A':
+          playerCarRef.current.manualControls.left = true;
+          break;
+        case 'ArrowRight':
+        case 'd':
+        case 'D':
+          playerCarRef.current.manualControls.right = true;
+          break;
+      }
+    };
+
+    const handleKeyUp = (e) => {
+      if (!playerCarRef.current) return;
+      
+      switch(e.key) {
+        case 'ArrowUp':
+        case 'w':
+        case 'W':
+          playerCarRef.current.manualControls.forward = false;
+          break;
+        case 'ArrowDown':
+        case 's':
+        case 'S':
+          playerCarRef.current.manualControls.backward = false;
+          break;
+        case 'ArrowLeft':
+        case 'a':
+        case 'A':
+          playerCarRef.current.manualControls.left = false;
+          break;
+        case 'ArrowRight':
+        case 'd':
+        case 'D':
+          playerCarRef.current.manualControls.right = false;
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [controlMode]);
+
+  // Update traffic density dynamically
+  useEffect(() => {
+    if (roadRef.current && trafficRef.current.length > 0) {
+      initializeTraffic();
+    }
+  }, [trafficDensity]);
+
   // Initialize simulation
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -81,7 +153,7 @@ export const Simulator = ({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [resetTrigger, populationSize]);
+  }, [resetTrigger, populationSize, controlMode]);
 
   const initializeCars = () => {
     const canvas = canvasRef.current;
