@@ -89,11 +89,21 @@ export const Simulator = ({
     const laneWidth = road.width / road.laneCount;
     const startX = road.x - road.width / 2 + laneWidth / 2 + laneWidth;
 
-    // Create AI cars
+    // Create cars based on control mode
     carsRef.current = [];
-    for (let i = 0; i < populationSize; i++) {
-      const car = new Car(startX, 100, 30, 50, 'AI', `hsl(${180 + i * 5}, 100%, ${50 + i}%)`);
+    
+    if (controlMode === 'MANUAL' || controlMode === 'AI_ASSIST') {
+      // Single player car
+      const car = new Car(startX, 100, 30, 50, controlMode, '#00ffff');
       carsRef.current.push(car);
+      playerCarRef.current = car;
+    } else {
+      // AI Auto mode - population of AI cars
+      playerCarRef.current = null;
+      for (let i = 0; i < populationSize; i++) {
+        const car = new Car(startX, 100, 30, 50, 'AI', `hsl(${180 + i * 5}, 100%, ${50 + i}%)`);
+        carsRef.current.push(car);
+      }
     }
 
     initializeTraffic();
