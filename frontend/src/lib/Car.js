@@ -409,7 +409,7 @@ export class Car {
 
   draw(ctx, drawSensors = false) {
     // Draw sensors
-    if (drawSensors && !this.damaged && this.controlType === 'AI') {
+    if (drawSensors && !this.damaged && (this.controlType === 'AI' || this.controlType === 'MANUAL' || this.controlType === 'AI_ASSIST')) {
       this.sensors.forEach((sensor, i) => {
         const rayAngle = this.angle + sensor.angle;
         const reading = this.sensorReadings[i];
@@ -446,6 +446,35 @@ export class Car {
       });
     }
 
+    // Draw safe direction arrow for manual/assist modes
+    if ((this.controlType === 'MANUAL' || this.controlType === 'AI_ASSIST') && !this.damaged && this.collisionProximity > 0.3 && this.safeDirection) {
+      const arrowLength = 40;
+      const arrowAngle = this.angle + this.safeDirection.angle;
+      const arrowEndX = this.x - Math.sin(arrowAngle) * arrowLength;
+      const arrowEndY = this.y - Math.cos(arrowAngle) * arrowLength;
+
+      // Draw arrow shaft
+      ctx.beginPath();
+      ctx.moveTo(this.x, this.y);
+      ctx.lineTo(arrowEndX, arrowEndY);
+      ctx.strokeStyle = `rgba(0, 255, 0, ${this.collisionProximity})`;
+      ctx.lineWidth = 4;
+      ctx.stroke();
+
+      // Draw arrow head
+      const headSize = 10;
+      const headAngle1 = arrowAngle + Math.PI * 0.75;
+      const headAngle2 = arrowAngle - Math.PI * 0.75;
+      ctx.beginPath();
+      ctx.moveTo(arrowEndX, arrowEndY);
+      ctx.lineTo(arrowEndX + Math.sin(headAngle1) * headSize, arrowEndY + Math.cos(headAngle1) * headSize);
+      ctx.moveTo(arrowEndX, arrowEndY);
+      ctx.lineTo(arrowEndX + Math.sin(headAngle2) * headSize, arrowEndY + Math.cos(headAngle2) * headSize);
+      ctx.strokeStyle = `rgba(0, 255, 0, ${this.collisionProximity})`;
+      ctx.lineWidth = 4;
+      ctx.stroke();
+    }
+
     // Draw car
     const polygon = this.getCarPolygon(this);
     ctx.beginPath();
@@ -455,7 +484,12 @@ export class Car {
     }
     ctx.closePath();
 
-    if (this.damaged) {
+    // Apply collision proximity red tint for manual/assist modes
+    if ((this.controlType === 'MANUAL' || this.controlType === 'AI_ASSIST') && !this.damaged) {
+      const redIntensity = this.collisionProximity;
+      const baseColor = this.parseColor(this.color);
+      ctx.fillStyle = `rgba(${Math.min(255, baseColor.r + redIntensity * 200)}, ${baseColor.g * (1 - redIntensity * 0.7)}, ${baseColor.b * (1 - redIntensity * 0.7)}, 1)`;
+    } else if (this.damaged) {
       ctx.fillStyle = 'rgba(150, 150, 150, 0.5)';
     } else {
       ctx.fillStyle = this.color;
@@ -471,5 +505,29 @@ export class Car {
       ctx.stroke();
       ctx.shadowBlur = 0;
     }
+
+    // Add glow for manual/assist cars
+    if ((this.controlType === 'MANUAL' || this.controlType === 'AI_ASSIST') && !this.damaged) {
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = this.collisionProximity > 0.5 ? '#ff0000' : this.color;
+      ctx.strokeStyle = this.collisionProximity > 0.5 ? `rgba(255, 0, 0, ${this.collisionProximity})` : this.color;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  parseColor(color) {
+    // Simple color parser for hex colors
+    if (color.startsWith('#')) {
+      const hex = color.slice(1);
+      return {
+        r: parseInt(hex.slice(0, 2), 16),
+        g: parseInt(hex.slice(2, 4), 16),
+        b: parseInt(hex.slice(4, 6), 16)
+      };
+    }
+    // Default to cyan
+    return { r: 0, g: 255, b: 255 };
   }
 }
