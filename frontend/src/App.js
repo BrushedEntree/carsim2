@@ -26,37 +26,19 @@ function App() {
   });
   const [resetTrigger, setResetTrigger] = useState(0);
 
-  const handleSave = () => {
-    try {
-      // In a real implementation, this would save the best network
-      const data = {
-        generation: stats.generation,
-        bestScore: stats.allTimeBest,
-        timestamp: new Date().toISOString()
-      };
-      localStorage.setItem('bestNetwork', JSON.stringify(data));
-      toast.success('Best network saved successfully!', {
-        description: `Generation ${stats.generation} - Score: ${stats.allTimeBest.toFixed(0)}`
-      });
-    } catch (error) {
-      toast.error('Failed to save network');
-    }
+  const handleSaveModel = (modelData) => {
+    // Model saved via ModelManager
   };
 
-  const handleLoad = () => {
-    try {
-      const saved = localStorage.getItem('bestNetwork');
-      if (saved) {
-        const data = JSON.parse(saved);
-        toast.success('Network loaded successfully!', {
-          description: `Generation ${data.generation} - Score: ${data.bestScore.toFixed(0)}`
-        });
-      } else {
-        toast.info('No saved network found');
-      }
-    } catch (error) {
-      toast.error('Failed to load network');
-    }
+  const handleLoadModel = (modelData) => {
+    // Model loaded via ModelManager
+    // In full implementation, this would load the brain data
+  };
+
+  const handleControlModeChange = (newMode) => {
+    setControlMode(newMode);
+    setResetTrigger(prev => prev + 1);
+    toast.info(`Switched to ${newMode === 'MANUAL' ? 'Manual Drive' : newMode === 'AI_AUTO' ? 'AI Auto' : 'AI Assist'} mode`);
   };
 
   const handleReset = () => {
