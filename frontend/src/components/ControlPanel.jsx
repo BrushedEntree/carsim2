@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Slider } from './ui/slider';
 import { Switch } from './ui/switch';
 import { Label } from './ui/label';
-import { Play, Pause, RotateCcw, Download, Upload } from 'lucide-react';
+import { Separator } from './ui/separator';
+import { Play, Pause, RotateCcw, Download, Upload, Database, Gamepad2, Brain, Users } from 'lucide-react';
 
 export const ControlPanel = ({
   isRunning,
@@ -19,7 +20,12 @@ export const ControlPanel = ({
   onSave,
   onLoad,
   populationSize,
-  onPopulationChange
+  onPopulationChange,
+  controlMode,
+  onControlModeChange,
+  trafficDensity,
+  onTrafficDensityChange,
+  onOpenModelManager
 }) => {
   return (
     <Card className="border-glow-cyan bg-card/50 backdrop-blur-sm">
