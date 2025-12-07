@@ -10,7 +10,9 @@ export const Simulator = ({
   showSensors,
   showNetwork,
   onStatsUpdate,
-  resetTrigger
+  resetTrigger,
+  controlMode = 'AI_AUTO',
+  trafficDensity = 100
 }) => {
   const canvasRef = useRef(null);
   const networkCanvasRef = useRef(null);
@@ -20,19 +22,24 @@ export const Simulator = ({
   const gaRef = useRef(null);
   const roadRef = useRef(null);
   const bestCarRef = useRef(null);
+  const playerCarRef = useRef(null);
 
   // Refs for props to access fresh values inside animation loop
   const isRunningRef = useRef(isRunning);
   const speedRef = useRef(speedMultiplier);
   const showSensorsRef = useRef(showSensors);
   const showNetworkRef = useRef(showNetwork);
+  const controlModeRef = useRef(controlMode);
+  const trafficDensityRef = useRef(trafficDensity);
 
   useEffect(() => {
     isRunningRef.current = isRunning;
     speedRef.current = speedMultiplier;
     showSensorsRef.current = showSensors;
     showNetworkRef.current = showNetwork;
-  }, [isRunning, speedMultiplier, showSensors, showNetwork]);
+    controlModeRef.current = controlMode;
+    trafficDensityRef.current = trafficDensity;
+  }, [isRunning, speedMultiplier, showSensors, showNetwork, controlMode, trafficDensity]);
 
   // Initialize simulation
   useEffect(() => {
