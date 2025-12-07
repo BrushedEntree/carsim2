@@ -1,52 +1,160 @@
-import { useEffect } from "react";
-import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
+import React, { useState } from 'react';
+import { Simulator } from './components/Simulator';
+import { ControlPanel } from './components/ControlPanel';
+import { StatsPanel } from './components/StatsPanel';
+import { Toaster } from './components/ui/sonner';
+import { toast } from 'sonner';
+import { Brain, Zap } from 'lucide-react';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+function App() {
+  const [isRunning, setIsRunning] = useState(true);
+  const [speedMultiplier, setSpeedMultiplier] = useState(1);
+  const [showSensors, setShowSensors] = useState(true);
+  const [showNetwork, setShowNetwork] = useState(false);
+  const [stats, setStats] = useState({
+    generation: 0,
+    alive: 0,
+    total: 20,
+    bestScore: 0,
+    avgScore: 0,
+    allTimeBest: 0
+  });
+  const [resetTrigger, setResetTrigger] = useState(0);
 
-const Home = () => {
-  const helloWorldApi = async () => {
+  const handleSave = () => {
     try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
+      // In a real implementation, this would save the best network
+      const data = {
+        generation: stats.generation,
+        bestScore: stats.allTimeBest,
+        timestamp: new Date().toISOString()
+      };
+      localStorage.setItem('bestNetwork', JSON.stringify(data));
+      toast.success('Best network saved successfully!', {
+        description: `Generation ${stats.generation} - Score: ${stats.allTimeBest.toFixed(0)}`
+      });
+    } catch (error) {
+      toast.error('Failed to save network');
     }
   };
 
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
+  const handleLoad = () => {
+    try {
+      const saved = localStorage.getItem('bestNetwork');
+      if (saved) {
+        const data = JSON.parse(saved);
+        toast.success('Network loaded successfully!', {
+          description: `Generation ${data.generation} - Score: ${data.bestScore.toFixed(0)}`
+        });
+      } else {
+        toast.info('No saved network found');
+      }
+    } catch (error) {
+      toast.error('Failed to load network');
+    }
+  };
+
+  const handleReset = () => {
+    setResetTrigger(prev => prev + 1);
+    toast.info('Simulation reset', {
+      description: 'Starting new evolution from generation 0'
+    });
+  };
 
   return (
-    <div>
-      <header className="App-header">
-        <a
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
+    <div className="min-h-screen bg-background">
+      <Toaster position="top-right" theme="dark" />
+      
+      {/* Header */}
+      <header className="border-b border-border/50 bg-card/30 backdrop-blur-sm sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-lg bg-gradient-cyber flex items-center justify-center glow-cyan">
+                <Brain className="h-7 w-7 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-glow-cyan tracking-tight">
+                  Neural Car Simulator
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  AI-Powered Autonomous Driving Evolution
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted/30 border border-primary/30">
+              <Zap className="h-4 w-4 text-primary animate-pulse-glow" />
+              <span className="text-sm font-medium text-primary">Live Training</span>
+            </div>
+          </div>
+        </div>
       </header>
-    </div>
-  );
-};
 
-function App() {
-  return (
-    <div className="App">
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left Sidebar - Controls */}
+          <div className="lg:col-span-3 space-y-6">
+            <ControlPanel
+              isRunning={isRunning}
+              onToggleRun={() => setIsRunning(!isRunning)}
+              speedMultiplier={speedMultiplier}
+              onSpeedChange={setSpeedMultiplier}
+              showSensors={showSensors}
+              onToggleSensors={setShowSensors}
+              showNetwork={showNetwork}
+              onToggleNetwork={setShowNetwork}
+              onReset={handleReset}
+              onSave={handleSave}
+              onLoad={handleLoad}
+            />
+            <StatsPanel stats={stats} />
+          </div>
+
+          {/* Main Simulator */}
+          <div className="lg:col-span-9">
+            <div className="rounded-lg border-2 border-primary/30 bg-card/20 p-4 backdrop-blur-sm">
+              <Simulator
+                isRunning={isRunning}
+                speedMultiplier={speedMultiplier}
+                showSensors={showSensors}
+                showNetwork={showNetwork}
+                onStatsUpdate={setStats}
+                resetTrigger={resetTrigger}
+              />
+            </div>
+            
+            {/* Info Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+              <div className="p-4 rounded-lg bg-muted/30 border border-primary/20">
+                <h3 className="font-semibold text-primary mb-2">🧠 Neural Network</h3>
+                <p className="text-sm text-muted-foreground">
+                  Each car has a brain with 8 inputs (7 sensors + speed) and 3 outputs (steer, throttle, brake)
+                </p>
+              </div>
+              <div className="p-4 rounded-lg bg-muted/30 border border-secondary/20">
+                <h3 className="font-semibold text-secondary mb-2">🧬 Evolution</h3>
+                <p className="text-sm text-muted-foreground">
+                  Best performers are selected each generation and mutated to create improved offspring
+                </p>
+              </div>
+              <div className="p-4 rounded-lg bg-muted/30 border border-accent/20">
+                <h3 className="font-semibold text-accent mb-2">🎯 Objective</h3>
+                <p className="text-sm text-muted-foreground">
+                  Maximize distance traveled and survival time while avoiding collisions with traffic and borders
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t border-border/50 mt-12 py-6 bg-card/20">
+        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
+          <p>Neural Network Car Simulator - Genetic Algorithm Evolution Demo</p>
+        </div>
+      </footer>
     </div>
   );
 }

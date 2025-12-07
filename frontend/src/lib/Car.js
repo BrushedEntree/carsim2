@@ -1,0 +1,341 @@
+import { NeuralNetwork } from './NeuralNetwork';
+
+export class Car {
+  constructor(x, y, width, height, controlType = 'AI', color = '#00ffff') {
+    this.x = x;
+    this.y = y;
+    this.width = width;
+    this.height = height;
+    this.color = color;
+    
+    this.speed = 0;
+    this.acceleration = 0.2;
+    this.maxSpeed = controlType === 'TRAFFIC' ? 2 : 3;
+    this.friction = 0.05;
+    this.angle = 0;
+    this.angleSpeed = 0.03;
+    
+    this.controlType = controlType;
+    this.damaged = false;
+    this.score = 0;
+    this.distanceTraveled = 0;
+    this.timeAlive = 0;
+    
+    // Sensors
+    this.sensors = this.createSensors();
+    this.sensorReadings = [];
+    
+    // Neural network for AI control
+    if (controlType === 'AI') {
+      this.brain = new NeuralNetwork(8, 8, 3); // 7 sensors + speed -> 8 hidden -> 3 outputs (steer, throttle, brake)
+    }
+    
+    // Traffic cars move at constant speed
+    if (controlType === 'TRAFFIC') {
+      this.speed = this.maxSpeed;
+    }
+  }
+  
+  createSensors() {
+    const rayCount = 7;
+    const rayAngles = [
+      0,           // forward
+      Math.PI / 4, // forward-right
+      -Math.PI / 4, // forward-left
+      Math.PI / 2, // right
+      -Math.PI / 2, // left
+      (3 * Math.PI) / 4, // backward-right
+      -(3 * Math.PI) / 4  // backward-left
+    ];
+    
+    return rayAngles.map(angle => ({
+      angle,
+      length: 150,
+      distance: 1 // Normalized distance (1 = nothing nearby, 0 = collision)
+    }));
+  }
+  
+  update(roadBorders, traffic, speedMultiplier = 1) {
+    if (!this.damaged) {
+      this.timeAlive += speedMultiplier;
+      
+      if (this.controlType === 'AI') {
+        this.move();
+        this.updateSensors(roadBorders, traffic);
+        this.aiControl();
+      } else if (this.controlType === 'TRAFFIC') {
+        this.y -= this.speed * speedMultiplier;
+      }
+      
+      // Track distance traveled
+      this.distanceTraveled = Math.abs(this.y);
+      this.score = this.distanceTraveled + this.timeAlive * 0.1;
+      
+      // Check collisions
+      this.damaged = this.assessDamage(roadBorders, traffic);
+    }
+  }
+  
+  move() {
+    // Update speed
+    this.speed -= this.friction;
+    if (this.speed < 0) this.speed = 0;
+    if (this.speed > this.maxSpeed) this.speed = this.maxSpeed;
+    
+    // Update angle (only when moving)
+    if (this.speed > 0.5) {
+      this.angle += this.angleSpeed;
+    }
+    
+    // Update position
+    this.x -= Math.sin(this.angle) * this.speed;
+    this.y -= Math.cos(this.angle) * this.speed;
+  }
+  
+  aiControl() {
+    // Prepare inputs: 7 sensor readings + current speed (normalized)
+    const inputs = [
+      ...this.sensorReadings.map(r => r ? r.distance : 1),
+      this.speed / this.maxSpeed
+    ];
+    
+    // Get neural network outputs
+    const { outputs } = this.brain.predict(inputs);
+    
+    // Apply outputs with smoothing
+    const steer = (outputs[0] - 0.5) * 2; // Convert 0-1 to -1 to 1
+    const throttle = outputs[1];
+    const brake = outputs[2];
+    
+    // Apply controls
+    this.angleSpeed = steer * 0.03;
+    
+    if (throttle > 0.5) {
+      this.speed += this.acceleration;
+    }
+    
+    if (brake > 0.5) {
+      this.speed -= this.acceleration * 2;
+    }
+  }
+  
+  updateSensors(roadBorders, traffic) {
+    this.sensorReadings = this.sensors.map(sensor => {
+      return this.castRay(sensor, roadBorders, traffic);
+    });
+  }
+  
+  castRay(sensor, roadBorders, traffic) {
+    const rayAngle = this.angle + sensor.angle;
+    const rayEnd = {
+      x: this.x - Math.sin(rayAngle) * sensor.length,
+      y: this.y - Math.cos(rayAngle) * sensor.length
+    };
+    
+    let minDistance = sensor.length;
+    let hit = null;
+    
+    // Check road borders
+    for (const border of roadBorders) {
+      const intersection = this.getIntersection(
+        { x: this.x, y: this.y },
+        rayEnd,
+        border[0],
+        border[1]
+      );
+      
+      if (intersection) {
+        const distance = this.getDistance({ x: this.x, y: this.y }, intersection);
+        if (distance < minDistance) {
+          minDistance = distance;
+          hit = intersection;
+        }
+      }
+    }
+    
+    // Check traffic cars
+    for (const car of traffic) {
+      if (car.damaged) continue;
+      const polygon = this.getCarPolygon(car);
+      for (let i = 0; i < polygon.length; i++) {
+        const intersection = this.getIntersection(
+          { x: this.x, y: this.y },
+          rayEnd,
+          polygon[i],
+          polygon[(i + 1) % polygon.length]
+        );
+        
+        if (intersection) {
+          const distance = this.getDistance({ x: this.x, y: this.y }, intersection);
+          if (distance < minDistance) {
+            minDistance = distance;
+            hit = intersection;
+          }
+        }
+      }
+    }
+    
+    return hit ? {
+      point: hit,
+      distance: 1 - (minDistance / sensor.length) // Normalize: 0 = far, 1 = close
+    } : null;
+  }
+  
+  getIntersection(p1, p2, p3, p4) {
+    const denom = (p4.y - p3.y) * (p2.x - p1.x) - (p4.x - p3.x) * (p2.y - p1.y);
+    if (denom === 0) return null;
+    
+    const ua = ((p4.x - p3.x) * (p1.y - p3.y) - (p4.y - p3.y) * (p1.x - p3.x)) / denom;
+    const ub = ((p2.x - p1.x) * (p1.y - p3.y) - (p2.y - p1.y) * (p1.x - p3.x)) / denom;
+    
+    if (ua >= 0 && ua <= 1 && ub >= 0 && ub <= 1) {
+      return {
+        x: p1.x + ua * (p2.x - p1.x),
+        y: p1.y + ua * (p2.y - p1.y)
+      };
+    }
+    return null;
+  }
+  
+  getDistance(p1, p2) {
+    return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+  }
+  
+  assessDamage(roadBorders, traffic) {
+    const polygon = this.getCarPolygon(this);
+    
+    // Check road borders
+    for (const border of roadBorders) {
+      if (this.polygonIntersectsLine(polygon, border[0], border[1])) {
+        return true;
+      }
+    }
+    
+    // Check traffic
+    for (const car of traffic) {
+      if (car.damaged) continue;
+      const otherPolygon = this.getCarPolygon(car);
+      if (this.polygonsIntersect(polygon, otherPolygon)) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+  
+  getCarPolygon(car) {
+    const points = [];
+    const rad = Math.hypot(car.width, car.height) / 2;
+    const alpha = Math.atan2(car.width, car.height);
+    
+    points.push({
+      x: car.x - Math.sin(car.angle - alpha) * rad,
+      y: car.y - Math.cos(car.angle - alpha) * rad
+    });
+    points.push({
+      x: car.x - Math.sin(car.angle + alpha) * rad,
+      y: car.y - Math.cos(car.angle + alpha) * rad
+    });
+    points.push({
+      x: car.x - Math.sin(Math.PI + car.angle - alpha) * rad,
+      y: car.y - Math.cos(Math.PI + car.angle - alpha) * rad
+    });
+    points.push({
+      x: car.x - Math.sin(Math.PI + car.angle + alpha) * rad,
+      y: car.y - Math.cos(Math.PI + car.angle + alpha) * rad
+    });
+    
+    return points;
+  }
+  
+  polygonIntersectsLine(polygon, p1, p2) {
+    for (let i = 0; i < polygon.length; i++) {
+      if (this.getIntersection(polygon[i], polygon[(i + 1) % polygon.length], p1, p2)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  
+  polygonsIntersect(polygon1, polygon2) {
+    for (let i = 0; i < polygon1.length; i++) {
+      for (let j = 0; j < polygon2.length; j++) {
+        if (this.getIntersection(
+          polygon1[i],
+          polygon1[(i + 1) % polygon1.length],
+          polygon2[j],
+          polygon2[(j + 1) % polygon2.length]
+        )) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+  
+  draw(ctx, drawSensors = false) {
+    // Draw sensors
+    if (drawSensors && !this.damaged && this.controlType === 'AI') {
+      this.sensors.forEach((sensor, i) => {
+        const rayAngle = this.angle + sensor.angle;
+        const reading = this.sensorReadings[i];
+        
+        let endX = this.x - Math.sin(rayAngle) * sensor.length;
+        let endY = this.y - Math.cos(rayAngle) * sensor.length;
+        
+        if (reading) {
+          endX = reading.point.x;
+          endY = reading.point.y;
+          
+          // Draw hit point
+          ctx.beginPath();
+          ctx.arc(reading.point.x, reading.point.y, 4, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255, 255, 0, 0.8)';
+          ctx.fill();
+          
+          // Hit segment (yellow)
+          ctx.beginPath();
+          ctx.moveTo(this.x, this.y);
+          ctx.lineTo(endX, endY);
+          ctx.strokeStyle = `rgba(255, 255, 0, ${0.8 * reading.distance})`;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        } else {
+          // Full ray (cyan)
+          ctx.beginPath();
+          ctx.moveTo(this.x, this.y);
+          ctx.lineTo(endX, endY);
+          ctx.strokeStyle = 'rgba(0, 255, 255, 0.2)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+      });
+    }
+    
+    // Draw car
+    const polygon = this.getCarPolygon(this);
+    ctx.beginPath();
+    ctx.moveTo(polygon[0].x, polygon[0].y);
+    for (let i = 1; i < polygon.length; i++) {
+      ctx.lineTo(polygon[i].x, polygon[i].y);
+    }
+    ctx.closePath();
+    
+    if (this.damaged) {
+      ctx.fillStyle = 'rgba(150, 150, 150, 0.5)';
+    } else {
+      ctx.fillStyle = this.color;
+    }
+    ctx.fill();
+    
+    // Add glow effect for AI cars
+    if (this.controlType === 'AI' && !this.damaged) {
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = this.color;
+      ctx.strokeStyle = this.color;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+  }
+}
