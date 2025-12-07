@@ -75,6 +75,18 @@ export class Car {
         this.move();
         this.updateSensors(roadBorders, traffic);
         this.aiControl();
+      } else if (this.controlType === 'MANUAL') {
+        this.move();
+        this.updateSensors(roadBorders, traffic);
+        this.manualControl();
+        this.calculateCollisionProximity();
+        this.calculateSafeDirection();
+      } else if (this.controlType === 'AI_ASSIST') {
+        this.move();
+        this.updateSensors(roadBorders, traffic);
+        this.aiAssistControl();
+        this.calculateCollisionProximity();
+        this.calculateSafeDirection();
       } else if (this.controlType === 'TRAFFIC') {
         this.y -= this.speed * speedMultiplier;
       }
