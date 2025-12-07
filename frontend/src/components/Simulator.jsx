@@ -113,10 +113,14 @@ export const Simulator = ({
     const road = roadRef.current;
     const laneWidth = road.width / road.laneCount;
 
+    // Calculate traffic count based on density (0-300%)
+    const baseDensity = 50;
+    const trafficCount = Math.floor(baseDensity * (trafficDensity / 100));
+
     // Create traffic
     trafficRef.current = [];
     const trafficColors = ['#ff00ff', '#ff0080', '#8000ff'];
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < trafficCount; i++) {
       const lane = Math.floor(Math.random() * road.laneCount);
       const x = road.x - road.width / 2 + laneWidth / 2 + lane * laneWidth;
       const y = -200 - i * 400; // More spacing for higher speed
