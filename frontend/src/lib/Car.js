@@ -25,8 +25,20 @@ export class Car {
     this.sensors = this.createSensors();
     this.sensorReadings = [];
 
+    // Manual control state
+    this.manualControls = {
+      forward: false,
+      backward: false,
+      left: false,
+      right: false
+    };
+
+    // Collision proximity (for visual warning)
+    this.collisionProximity = 0; // 0 = safe, 1 = imminent collision
+    this.safeDirection = null; // Direction with most clearance
+
     // Neural network for AI control
-    if (controlType === 'AI') {
+    if (controlType === 'AI' || controlType === 'MANUAL' || controlType === 'AI_ASSIST') {
       this.brain = new NeuralNetwork(8, 8, 3); // 7 sensors + speed -> 8 hidden -> 3 outputs (steer, throttle, brake)
     }
 
