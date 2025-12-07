@@ -150,6 +150,19 @@ function App() {
           <p>Neural Network Car Simulator - Genetic Algorithm Evolution Demo</p>
         </div>
       </footer>
+
+      {/* Model Manager Dialog */}
+      <ModelManager
+        open={modelManagerOpen}
+        onOpenChange={setModelManagerOpen}
+        currentModel={{
+          generation: stats.generation,
+          bestScore: stats.allTimeBest,
+          brainData: null // Would contain actual brain data in full implementation
+        }}
+        onSave={handleSaveModel}
+        onLoad={handleLoadModel}
+      />
     </div>
   );
 }
