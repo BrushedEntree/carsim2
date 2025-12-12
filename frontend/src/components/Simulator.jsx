@@ -419,15 +419,27 @@ export const Simulator = ({
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const margin = 20;
+    const margin = 30; // Increased margin for labels
     const width = canvas.width - margin * 2;
     const height = canvas.height - margin * 2;
 
     // Get network data
+    // Ensure we always have 7 sensor readings (pad with 0 if missing)
+    const sensorInputs = car.sensorReadings.map(r => r ? r.distance : 0);
+    while (sensorInputs.length < 7) {
+      sensorInputs.push(0);
+    }
+
     const inputs = [
-      ...car.sensorReadings.map(r => r ? r.distance : 0),
+      ...sensorInputs,
       car.speed / car.maxSpeed
     ];
+
+    if (inputs.length !== 8) {
+      console.warn('Network input mismatch:', inputs.length);
+      return;
+    }
+
     const { hidden, outputs } = car.brain.predict(inputs);
 
     const layers = [
@@ -436,75 +448,101 @@ export const Simulator = ({
       { nodes: outputs, label: 'Outputs' }
     ];
 
-    const layerSpacing = width / (layers.length + 1);
+    // Input labels mapping
+    const inputLabels = ['Front', 'F-Right', 'F-Left', 'Right', 'Left', 'B-Right', 'B-Left', 'Speed'];
 
-    // Draw connections
-    ctx.strokeStyle = 'rgba(0, 255, 255, 0.1)';
-    ctx.lineWidth = 1;
-    for (let l = 0; l < layers.length - 1; l++) {
-      const layer1 = layers[l];
-      const layer2 = layers[l + 1];
-      const x1 = margin + (l + 1) * layerSpacing;
-      const x2 = margin + (l + 2) * layerSpacing;
+    const layerSpacing = width / (layers.length - 0.5); // Adjusted spacing
 
-      for (let i = 0; i < layer1.nodes.length; i++) {
-        const y1 = margin + (i + 1) * (height / (layer1.nodes.length + 1));
-        for (let j = 0; j < layer2.nodes.length; j++) {
-          const y2 = margin + (j + 1) * (height / (layer2.nodes.length + 1));
+    // Helper to get node position
+    const getNodePos = (layerIndex, nodeIndex, totalNodes) => {
+      const x = margin + layerIndex * layerSpacing + 40;
+      const ySpacing = height / (totalNodes + 1);
+      const y = margin + (nodeIndex + 1) * ySpacing;
+      return { x, y };
+    };
 
-          const value = layer2.nodes[j];
-          ctx.strokeStyle = `rgba(0, 255, 255, ${value * 0.5})`;
+    // Draw connections (Input -> Hidden)
+    const drawConnections = (layerIdx, weights, sourceNodes, targetNodes) => {
+      for (let i = 0; i < sourceNodes.length; i++) {
+        for (let j = 0; j < targetNodes.length; j++) {
+          const weight = weights[i][j];
+          const pos1 = getNodePos(layerIdx, i, sourceNodes.length);
+          const pos2 = getNodePos(layerIdx + 1, j, targetNodes.length);
+
+          const alpha = Math.min(1, Math.abs(weight));
+          const color = weight > 0 ? `rgba(0, 255, 255, ${alpha})` : `rgba(255, 0, 128, ${alpha})`;
+
           ctx.beginPath();
-          ctx.moveTo(x1, y1);
-          ctx.lineTo(x2, y2);
+          ctx.moveTo(pos1.x, pos1.y);
+          ctx.lineTo(pos2.x, pos2.y);
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 0.5 + alpha * 1.5;
           ctx.stroke();
         }
       }
+    };
+
+    // Draw connections: Input -> Hidden
+    if (car.brain.weightsInputHidden) {
+      drawConnections(0, car.brain.weightsInputHidden, inputs, hidden);
+    }
+
+    // Draw connections: Hidden -> Output
+    if (car.brain.weightsHiddenOutput) {
+      drawConnections(1, car.brain.weightsHiddenOutput, hidden, outputs);
     }
 
     // Draw nodes
     layers.forEach((layer, l) => {
-      const x = margin + (l + 1) * layerSpacing;
       layer.nodes.forEach((value, i) => {
-        const y = margin + (i + 1) * (height / (layer.nodes.length + 1));
+        const { x, y } = getNodePos(l, i, layer.nodes.length);
 
-        // Node circle
+        // Node circle background
+        ctx.beginPath();
+        ctx.arc(x, y, 10, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(20, 20, 30, 0.9)';
+        ctx.fill();
+
+        // Node activation fill
         ctx.beginPath();
         ctx.arc(x, y, 8, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(0, 255, 255, ${0.2 + value * 0.8})`;
+        // Yellow/White for high activation, dim for low
+        ctx.fillStyle = `rgba(255, 255, 255, ${value})`;
         ctx.fill();
-        ctx.strokeStyle = '#00ffff';
+
+        // Node border
+        ctx.beginPath();
+        ctx.arc(x, y, 10, 0, Math.PI * 2);
+        ctx.strokeStyle = value > 0.5 ? '#ffffff' : 'rgba(255, 255, 255, 0.3)';
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Add glow for active nodes
-        if (value > 0.5) {
-          ctx.shadowBlur = 15;
-          ctx.shadowColor = '#00ffff';
-          ctx.beginPath();
-          ctx.arc(x, y, 8, 0, Math.PI * 2);
-          ctx.stroke();
-          ctx.shadowBlur = 0;
+        // Labels
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '11px "Space Mono", monospace';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+
+        if (l === 0) {
+          // Input Labels
+          ctx.fillText(inputLabels[i] || `I${i}`, x - 15, y);
+        } else if (l === layers.length - 1) {
+          // Output Labels
+          const outputLabels = ['Steer', 'Throttle', 'Brake'];
+          ctx.textAlign = 'left';
+          ctx.fillText(outputLabels[i], x + 15, y);
+          // Value
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+          ctx.fillText(value.toFixed(2), x + 65, y);
         }
       });
 
-      // Layer label
+      // Layer Header
+      const { x } = getNodePos(l, 0, 1);
       ctx.fillStyle = '#00ffff';
       ctx.font = '12px "Space Mono", monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(layer.label, x, margin / 2);
-    });
-
-    // Output labels
-    const outputLabels = ['Steer', 'Throttle', 'Brake'];
-    const outputLayer = layers[layers.length - 1];
-    const x = margin + layers.length * layerSpacing;
-    outputLayer.nodes.forEach((value, i) => {
-      const y = margin + (i + 1) * (height / (outputLayer.nodes.length + 1));
-      ctx.fillStyle = '#00ffff';
-      ctx.font = '10px "Space Mono", monospace';
-      ctx.textAlign = 'left';
-      ctx.fillText(`${outputLabels[i]}: ${value.toFixed(2)}`, x + 15, y + 4);
+      ctx.fillText(layer.label, x, margin - 15);
     });
   };
 
